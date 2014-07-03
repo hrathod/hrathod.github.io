@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Java8 | H.Rathod Blog]]></title>
+  <link href="http://hrathod.github.io/blog/categories/java8/atom.xml" rel="self"/>
+  <link href="http://hrathod.github.io/"/>
+  <updated>2014-07-03T17:45:27-04:00</updated>
+  <id>http://hrathod.github.io/</id>
+  <author>
+    <name><![CDATA[Himanshu Rathod]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[REST Resource With Optionals]]></title>
+    <link href="http://hrathod.github.io/blog/2014/07/03/rest-resource-with-optionals/"/>
+    <updated>2014-07-03T10:44:30-04:00</updated>
+    <id>http://hrathod.github.io/blog/2014/07/03/rest-resource-with-optionals</id>
+    <content type="html"><![CDATA[<p>One of the new classes added to Java 8 is
+<a href="http://docs.oracle.com/javase/8/docs/api/java/util/Optional.html" title="java.util.Optional Javadocs">java.util.Optional</a>,
+intended to reduce the errors surrounding the use of <em>null</em>.  One of the
+recommended uses of the Optional class is the return value of a method that may
+return a <em>null</em> value.</p>
+
+<p>As an extension of this idea, it might be an interesting experiment to use
+Optional return values from RESTful service resource methods, to indicate
+when a resource may return a <em>null</em>.  A common scenario might be to pass
+an ID to a resource method, which then looks up a resource by that ID.  What
+if that resource does not exist?  Normally, the method would return <em>null</em>.
+Instead, to document the fact that the method may return null, the Optional
+class can be used.</p>
+
+<!-- more -->
+
+
+<p>The question becomes, then, how do we map Optional return values to correct HTTP
+status codes?  The following experiment is one way to approach the problem.</p>
+
+<p>Let&rsquo;s begin with the basic <a href="http://resteasy.jboss.org/" title="RESTEasy Website">RESTEasy</a>
+web.xml setup.</p>
+
+<p>``` xml web.xml
+&lt;!DOCTYPE web-app PUBLIC</p>
+
+<pre><code>    "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+    "http://java.sun.com/dtd/web-app_2_3.dtd" &gt;
+</code></pre>
+
+<p>&lt;web-app></p>
+
+<pre><code>&lt;display-name&gt;Example Webapp with RESTEasy and Optionals&lt;/display-name&gt;
+&lt;servlet&gt;
+    &lt;servlet-name&gt;resteasy&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher&lt;/servlet-class&gt;
+    &lt;init-param&gt;
+        &lt;param-name&gt;javax.ws.rs.Application&lt;/param-name&gt;
+        &lt;param-value&gt;io.github.hrathod.blog.resteasy.SimpleApplication&lt;/param-value&gt;
+    &lt;/init-param&gt;
+&lt;/servlet&gt;
+&lt;servlet-mapping&gt;
+    &lt;servlet-name&gt;resteasy&lt;/servlet-name&gt;
+    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+&lt;/servlet-mapping&gt;
+</code></pre>
+
+<p>&lt;/web-app>
+```</p>
+
+<p>We simply set up the RESTEasy dispatch servlet, and configure it to use our
+Application subclass.  The Application subclass in turn will configure RESTEasy
+to use the various classes needed for setting up the services.</p>
+
+<p>``` java SimpleApplication.java
+import java.util.HashSet;
+import java.util.Set;</p>
+
+<p>import javax.ws.rs.core.Application;</p>
+
+<p>public class SimpleApplication extends Application {</p>
+
+<pre><code>private final Set&lt;Object&gt; singletons = new HashSet&lt;&gt;();
+
+public SimpleApplication () {
+    this.singletons.add(new SimpleResource());
+    this.singletons.add(new OptionalFilter());
+}
+
+@Override
+public Set&lt;Object&gt; getSingletons() {
+    return this.singletons;
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>The SimpleApplication class simply registers two classes, a resource class
+and a container filter.  The SimpleResource class is just a regular resource
+class, with the normal annotations.</p>
+
+<p>``` java SimpleResource.java
+import java.util.Optional;</p>
+
+<p>import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;</p>
+
+<p>@Path(&ldquo;/simple&rdquo;)
+public class SimpleResource {</p>
+
+<pre><code>private final SimpleDao dao = new SimpleDao();
+
+@GET
+@Produces(MediaType.TEXT_PLAIN)
+@Path("/{id}")
+public Optional&lt;SimpleModel&gt; get (@PathParam("id") String id) {
+    return this.dao.get(id);
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>The only interesting part of the SimpleResource class is that it returns an
+Optional<SimpleModel> instead of simply returning a SimpleModel.  This is
+nice documentation within the code that the method may return a response
+with a <em>null</em> value.  Also notice that the DAO is returning an Optional
+as well, which also indicates that a <em>null</em> may be returned if the
+given id is not found.</p>
+
+<p>The (slightly) more interesting class is OptionalFilter.  This class
+converts an Optional return value from a resource method to the
+appropriate HTTP status code and returns the correct entity.</p>
+
+<p>``` java OptionalFilter.java
+import java.io.IOException;
+import java.util.Optional;</p>
+
+<p>import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.Provider;</p>
+
+<p>import org.jboss.resteasy.annotations.interception.ServerInterceptor;</p>
+
+<p>@Provider
+@ServerInterceptor
+public class OptionalFilter implements ContainerResponseFilter {</p>
+
+<pre><code>@Override
+public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
+    Object entity = responseContext.getEntity();
+    if (Optional.class.isAssignableFrom(entity.getClass())) {
+        Optional&lt;?&gt; optional = (Optional&lt;?&gt;) entity;
+        if (optional.isPresent()) {
+            responseContext.setEntity(optional.get());
+        } else {
+            responseContext.setEntity(null);
+            responseContext.setStatus(Response.Status.NO_CONTENT.getStatusCode());
+        }
+    }
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>The filter simply checks if the entity returned by the resource method is an
+Optional.  If it is, the value is fetched from the Optional if it is present,
+and set in the response.  If the value is not present, we alter the HTTP
+status code of the response to a &ldquo;204 No Content&rdquo;, and set the entity to <em>null</em>.
+The setting of the entity to <em>null</em> may not be entirely necessary, but since
+&ldquo;No Content&rdquo; implies lack of content, it may be better to ensure the lack of
+content.</p>
+
+<p>A Maven project containing a working example is available from the
+[GitHub repo](<a href="https://github.com/hrathod/resteasy-optionals">https://github.com/hrathod/resteasy-optionals</a> &ldquo;RESTEasy-Optionals&rdquo;].
+To run it, clone the repo and use the jetty:run maven goal.</p>
+
+<p><code>bash
+$ mvn jetty:run
+</code></p>
+
+<p>Curl or Wget can be used to test the HTTP status codes.  If the ID is &ldquo;test&rdquo;, the
+content should be delivered.  With any other ID, a &ldquo;No Content&rdquo; status should be
+returned.</p>
+
+<p>``` bash
+$ curl -v <a href="http://localhost:8080/simple/test">http://localhost:8080/simple/test</a>
+* Adding handle: conn: 0x1b868b0
+* Adding handle: send: 0
+* Adding handle: recv: 0
+* Curl_addHandleToPipeline: length: 1
+* &ndash; Conn 0 (0x1b868b0) send_pipe: 1, recv_pipe: 0
+* About to connect() to localhost port 8080 (#0)
+*   Trying ::1&hellip;
+* Connected to localhost (::1) port 8080 (#0)</p>
+
+<blockquote><p>GET /simple/test HTTP/1.1
+User-Agent: curl/7.32.0
+Host: localhost:8080
+Accept: <em>/</em></p>
+
+<p>&lt; HTTP/1.1 200 OK
+&lt; Date: Thu, 03 Jul 2014 21:32:48 GMT
+&lt; Content-Type: text/plain
+&lt; Content-Length: 10
+* Server Jetty(9.2.0.RC0) is not blacklisted
+&lt; Server: Jetty(9.2.0.RC0)
+&lt;
+* Connection #0 to host localhost left intact
+test model
+```</p></blockquote>
+
+<p>``` bash
+$ curl -v <a href="http://localhost:8080/simple/foo">http://localhost:8080/simple/foo</a>
+* Adding handle: conn: 0x20a08b0
+* Adding handle: send: 0
+* Adding handle: recv: 0
+* Curl_addHandleToPipeline: length: 1
+* &ndash; Conn 0 (0x20a08b0) send_pipe: 1, recv_pipe: 0
+* About to connect() to localhost port 8080 (#0)
+*   Trying ::1&hellip;
+* Connected to localhost (::1) port 8080 (#0)</p>
+
+<blockquote><p>GET /simple/foo HTTP/1.1
+User-Agent: curl/7.32.0
+Host: localhost:8080
+Accept: <em>/</em></p>
+
+<p>&lt; HTTP/1.1 204 No Content
+&lt; Date: Thu, 03 Jul 2014 21:35:37 GMT
+&lt; Content-Type: text/plain
+* Server Jetty(9.2.0.RC0) is not blacklisted
+&lt; Server: Jetty(9.2.0.RC0)
+&lt;
+* Connection #0 to host localhost left intact
+```</p></blockquote>
+]]></content>
+  </entry>
+  
+</feed>
