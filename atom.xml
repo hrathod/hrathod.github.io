@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[HRathod Blog]]></title>
+  <link href="http://hrathod.github.io/atom.xml" rel="self"/>
+  <link href="http://hrathod.github.io/"/>
+  <updated>2014-07-03T10:29:51-04:00</updated>
+  <id>http://hrathod.github.io/</id>
+  <author>
+    <name><![CDATA[Himanshu Rathod]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+</feed>
