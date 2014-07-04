@@ -4,7 +4,7 @@
   <title><![CDATA[H.Rathod Blog]]></title>
   <link href="http://hrathod.github.io/atom.xml" rel="self"/>
   <link href="http://hrathod.github.io/"/>
-  <updated>2014-07-03T17:45:27-04:00</updated>
+  <updated>2014-07-03T21:57:30-04:00</updated>
   <id>http://hrathod.github.io/</id>
   <author>
     <name><![CDATA[Himanshu Rathod]]></name>
@@ -255,7 +255,7 @@ The setting of the entity to <em>null</em> may not be entirely necessary, but si
 content.</p>
 
 <p>A Maven project containing a working example is available from the
-[GitHub repo](<a href="https://github.com/hrathod/resteasy-optionals">https://github.com/hrathod/resteasy-optionals</a> &ldquo;RESTEasy-Optionals&rdquo;].
+<a href="https://github.com/hrathod/resteasy-optionals" title="RESTEasy-Optionals">GitHub repo</a>.
 To run it, clone the repo and use the jetty:run maven goal.</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
