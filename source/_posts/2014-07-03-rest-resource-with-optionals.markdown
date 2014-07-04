@@ -155,7 +155,7 @@ The setting of the entity to _null_ may not be entirely necessary, but since
 content.
 
 A Maven project containing a working example is available from the
-[GitHub repo](https://github.com/hrathod/resteasy-optionals "RESTEasy-Optionals"].
+[GitHub repo](https://github.com/hrathod/resteasy-optionals "RESTEasy-Optionals").
 To run it, clone the repo and use the jetty:run maven goal.
 
 ``` bash
